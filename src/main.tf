@@ -1,0 +1,90 @@
+provider "aws"{
+    region = "eu-central-1"
+}
+
+terraform{
+    backend "s3"{
+        bucket = "alexandre-terraform-github-actions"
+        key = "terraform.tfstate"
+        region = "eu-central-1"
+    }
+}
+
+resource "aws_vpc" "my_vpc" {
+  cidr_block = "10.0.0.0/16"
+  tags = {
+    Name = "Alexandre-VPC"
+  }
+}
+
+resource "aws_subnet" "public_subnet" {
+  vpc_id                  = aws_vpc.my_vpc.id # resource_keysyntax. logicalId. Id  = !Ref 
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "eu-central-1a"
+  map_public_ip_on_launch = true
+  tags = {
+    Name = "Alexandre-PublicSubnet"
+  }
+}
+
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.my_vpc.id
+  tags = {
+    Name = "Alexandre-IGW"
+  }
+}
+
+
+resource "aws_route_table" "public_rt" {
+  vpc_id = aws_vpc.my_vpc.id
+  tags = {
+    Name = "Alexandre-routeTable"
+  }
+}
+
+resource "aws_route" "internet_access" {
+  route_table_id         = aws_route_table.public_rt.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.igw.id
+}
+
+
+resource "aws_route_table_association" "public-association" {
+  subnet_id      = aws_subnet.public_subnet.id
+  route_table_id = aws_route_table.public_rt.id
+}
+
+resource "aws_security_group" "my_sg" {
+  vpc_id = aws_vpc.my_vpc.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "Alexandre-SecurityGroup"
+  }
+}
+
+
+
+resource "aws_instance" "my_ec2" {
+  ami                    = "ami-0084a47cc718c111a"
+  instance_type          = "t2.micro"
+  subnet_id              = aws_subnet.public_subnet.id
+  vpc_security_group_ids = [aws_security_group.my_sg.id]
+  tags = {
+    Name = "Alexandre-Ec2Instance"
+  }
+}
